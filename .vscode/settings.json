@@ -1,0 +1,32 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "tsconfig.json": "tsconfig.*.json, env.d.ts",
+    "vite.config.*": "jsconfig*, vitest.config.*, cypress.config.*, playwright.config.*",
+    "package.json": "package-lock.json, pnpm*, .yarnrc*, yarn*, .eslint*, eslint*, .oxlint*, oxlint*, .prettier*, prettier*, .editorconfig"
+  },
+
+  // Editor assistance settings to improve help while coding
+  "editor.quickSuggestions": { "other": true, "comments": false, "strings": false },
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.acceptSuggestionOnEnter": "on",
+  "editor.inlineSuggest.enabled": true,
+  "editor.parameterHints.enabled": true,
+  "editor.hover.enabled": true,
+  "editor.wordBasedSuggestions": "matchingDocuments",
+  "editor.suggest.showIcons": true,
+  "editor.suggestSelection": "first",
+  "editor.suggest.localityBonus": true,
+  "editor.tabCompletion": "on",
+
+  // Optional: enable inline suggestions from language servers
+  "editor.inlineHints.enabled": "on",
+
+  // Files excluded from search (keep existing defaults)
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true
+  }
+}
+
