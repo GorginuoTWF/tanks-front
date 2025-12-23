@@ -12,7 +12,7 @@
   "editor.acceptSuggestionOnEnter": "on",
   "editor.inlineSuggest.enabled": true,
   "editor.parameterHints.enabled": true,
-  "editor.hover.enabled": true,
+  "editor.hover.enabled": "on",
   "editor.wordBasedSuggestions": "matchingDocuments",
   "editor.suggest.showIcons": true,
   "editor.suggestSelection": "first",

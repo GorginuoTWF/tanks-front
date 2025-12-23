@@ -12,22 +12,46 @@ let selectedType = ref("");
 let allTanks = ref([]);
 let countries = ref([]);
 let types = ref([]);
+let tankOfTheDay = ref(null);
+let allTanksRaw = ref([])
 
 onMounted(() => {
   getTanks();
   loadFilters();
 });
 
+const hashCode = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
+};
+
+const pickTankOfTheDay = () => {
+  if (allTanks.value.length === 0) return;
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const seed = Math.abs(hashCode(today));
+  const index = seed % allTanks.value.length;
+
+  tankOfTheDay.value = allTanksRaw.value[index];
+  console.log("Tank of the Day:", tankOfTheDay.value);
+  getFirstPhoto(tankOfTheDay.value.tank_id);
+};
+
 const getTanks = () => {
   fetch("http://localhost:3000/tanks")
     .then(res => res.json())
     .then(data => {
       tanks.value = data;
-      tanks.value.forEach(tank => getFirstPhoto(tank.tank_id));
-      tanks.value = data;
-      allTanks.value = data; // сохраняем оригинальный массив для поиска
-      firstTankPhotos.value = {};
+      allTanks.value = data;
+      allTanksRaw.value = data; // сохраняем для поиска
+
       data.forEach(t => getFirstPhoto(t.tank_id));
+      pickTankOfTheDay(); // Pick after tanks are loaded
     });
 };
 const searchTanks = () => {
@@ -35,7 +59,6 @@ const searchTanks = () => {
 
   if (!searchQuery.value.trim()) {
     tanks.value = baseList; 
-    firstTankPhotos.value = {};
     baseList.forEach(t => getFirstPhoto(t.tank_id));
     return;
   }
@@ -45,10 +68,11 @@ const searchTanks = () => {
   );
 
   tanks.value = filtered;
-  firstTankPhotos.value = {};
   filtered.forEach(t => getFirstPhoto(t.tank_id));
 };
 const getFirstPhoto = (tank_id) => {
+  if (firstTankPhotos.value[tank_id]) return;
+
   fetch(`http://localhost:3000/tanks/${tank_id}/photos`)
     .then(res => res.json())
     .then(data => {
@@ -64,6 +88,7 @@ const uploadPhotos = (tank_id, files) => {
     body: formData
   }).then(() => getFirstPhoto(tank_id));
 };
+
 const loadFilters = async () => {
   countries.value = await fetch("http://localhost:3000/countries").then(r => r.json());
   types.value = await fetch("http://localhost:3000/types").then(r => r.json());
@@ -81,20 +106,56 @@ const filterTanks = async () => {
     const data = await fetch(url).then(r => r.json());
 
     tanks.value = data;
-    allTanks.value = data;  // сохраняем для поиска
-    firstTankPhotos.value = {};
+    allTanks.value = data; 
+    
+    //allTanksRaw.value = data;
+     // сохраняем для поиска
     data.forEach(t => getFirstPhoto(t.tank_id));
   } catch (err) {
     console.error(err);
     tanks.value = [];
     allTanks.value = [];
-    firstTankPhotos.value = {};
   }
 };
+
 
 </script>
 
 <template>
+<h2>Tank of the Day</h2>
+   <div v-if="tankOfTheDay" class="tank-of-the-day-card">
+    <!-- Left: Image -->
+    <router-link :to="`http://localhost:3000/tank/${tankOfTheDay.tank_id}`">
+      <img
+        v-if="firstTankPhotos[tankOfTheDay.tank_id]"
+        :src="`http://localhost:3000/uploads/tankphoto/${firstTankPhotos[tankOfTheDay.tank_id].filename}`"
+        class="tank-image"
+        alt="Tank of the Day"
+      />
+      <div v-else class="tank-image placeholder">No Photo</div>
+    </router-link>
+
+    <!-- Right: Info -->
+    <div class="tank-info">
+      <p class="tank-name">{{ tankOfTheDay.name }}</p>
+      <p><b>Country:</b> {{ tankOfTheDay.country?.name }}</p>
+      <p><b>Type:</b> {{ tankOfTheDay.vehicle_type?.name }}</p>
+      <p><b>Weight:</b> {{ tankOfTheDay.weight_kg }} kg</p>
+      <p><b>Crew:</b> {{ tankOfTheDay.crew }}</p>
+      <p><b>Engine:</b> {{ tankOfTheDay.engine_power_hp }} hp</p>
+      <p><b>Speed:</b> {{ tankOfTheDay.top_speed_kmh }} km/h</p>
+      <p><b>Armor:</b> Front: {{ tankOfTheDay.armor_front_mm }} mm | Side: {{ tankOfTheDay.armor_side_mm }} mm | Rear: {{ tankOfTheDay.armor_rear_mm }} mm</p>
+      <p><b>Gun:</b> {{ tankOfTheDay.gun_caliber_mm }} mm</p>
+      <p><b>Penetration:</b> {{ tankOfTheDay.penetration_mm }} mm</p>
+      <p><b>Introduced:</b> {{ tankOfTheDay.year_introduced }}</p>
+      <p v-if="tankOfTheDay.summary"><b>Summary:</b> {{ tankOfTheDay.summary }}</p>
+
+      <div v-if="loggedUser?.role === 'admin'" class="upload-block">
+        <input type="file" multiple @change="e => uploadPhotos(tankOfTheDay.tank_id, e.target.files)" />
+      </div>
+    </div>
+  </div>
+
   <div class="top-bar">
   <input
     v-model="searchQuery"
@@ -120,7 +181,7 @@ const filterTanks = async () => {
       :key="tank.tank_id"
       class="tank-card"
     >
-      <router-link :to="`/tank/${tank.tank_id}`">
+      <router-link :to="`http://localhost:3000http://localhost:3000/tank/${tank.tank_id}`">
         <img
           v-if="firstTankPhotos[tank.tank_id]"
           :src="`http://localhost:3000/uploads/tankphoto/${firstTankPhotos[tank.tank_id].filename}`"
@@ -140,13 +201,35 @@ const filterTanks = async () => {
 
 
 <style scoped>
-/* SEARCH BAR */
-.top-bar {
+/* TANK OF THE DAY */
+.tank-of-the-day-card {
   display: flex;
-  justify-content: space-between; /* поиск слева, фильтры справа */
-  align-items: center;
-  width: 100%;
-  margin-top: 25px;
+  align-items: flex-start; /* top align so info starts at top of image */
+  gap: 20px;
+  max-width: 800px;
+  margin: 0 0 40px 0; /* top/bottom spacing, flush to left */
+  padding: 20px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-radius: 18px;
+}
+
+.tank-of-the-day-card .tank-image {
+  width: 350px; /* fixed width for left image */
+  height: auto; /* keep aspect ratio */
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.tank-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.tank-info p {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
 }
 .search-container {
   width: 100%;

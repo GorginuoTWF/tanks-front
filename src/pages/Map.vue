@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { store } from '../store';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -11,6 +13,8 @@ L.Icon.Default.mergeOptions({
 });
 
 let battleLocations = ref([]);
+
+const router = useRouter();
 
 onMounted(() => {
   fetch('http://localhost:3000/map')
@@ -39,15 +43,33 @@ const initMap = () => {
       `);
   });
 };
+
+const addNewLocation = () => {
+  router.push('/battle/new');
+};
 </script>
 
 <template>
   <h1>Battle Locations Map</h1>
+  <button v-if="store.loggedUser?.role === 'admin'" class="add-btn" @click="addNewLocation">Add New Location</button>
   <div id="map" style="height: 600px; width: 100%;"></div>
 </template>
 
 <style>
 #map {
   height: 600px;
+}
+.add-btn {
+  background-color: #03A9F4;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-bottom: 20px;
+}
+.add-btn:hover {
+  background-color: #0288D1;
 }
 </style>

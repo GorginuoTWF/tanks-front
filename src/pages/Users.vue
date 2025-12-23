@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { store } from "../store";
 
+
 // === REACTIVE DATA ===
 const users = ref([]);
 const searchQuery = ref("");
@@ -30,7 +31,23 @@ const adminEdit = ref({
   avatar: null,        // File
   previewAvatar: "",  // base64 preview
 });
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{6,}$/;
+const emailCode = ref("");
+const emailVerified = ref(false);
+const codeSent = ref(false);
 
+const validateRegister = () => {
+  if (!emailRegex.test(newUser.value.email)) {
+    return "Invalid email format";
+  }
+
+  if (!passwordRegex.test(newUser.value.password)) {
+    return "Password must be at least 6 characters and contain uppercase, lowercase and special character";
+  }
+
+  return null;
+};
 // === LIFECYCLE ===
 onMounted(() => {
   const saved = localStorage.getItem("loggedUser");
@@ -67,14 +84,19 @@ const login = async () => {
 
 const addUser = async () => {
   errorMessage.value = "";
+
   if (!newUser.value.nickname || !newUser.value.password || !newUser.value.email) {
     return (errorMessage.value = "All fields required");
   }
-  if (newUser.value.password.length < 6) {
-    return (errorMessage.value = "Password min 6 chars");
-  }
 
-  // Erika → admin
+  const validationError = validateRegister();
+  if (validationError) {
+    return (errorMessage.value = validationError);
+  }
+  if (!emailVerified.value) {
+  return (errorMessage.value = "Email not verified");
+}
+
   const isErika = newUser.value.nickname.toLowerCase().includes("erika");
   const body = { ...newUser.value, role: isErika ? "admin" : "user" };
 
@@ -83,10 +105,12 @@ const addUser = async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   const data = await res.json();
 
-  if (data.error) errorMessage.value = data.error;
-  else {
+  if (data.error) {
+    errorMessage.value = data.error;
+  } else {
     getUsers();
     newUser.value = { nickname: "", password: "", email: "" };
     showRegister.value = false;
@@ -95,15 +119,69 @@ const addUser = async () => {
 
 const deleteUser = async (id) => {
   if (!confirm("Delete user?")) return;
-  await fetch(`http://localhost:3000/users/${id}`, { method: "DELETE" });
+  await fetch(`http://localhost:3000/users/${id}`, {
+  method: "DELETE",
+  headers: {
+    "x-role": store.loggedUser.role
+  }
+});
   getUsers();
 };
 
 const removeFavourite = async (id) => {
-  await fetch(`http://localhost:3000/users/${id}/favourite`, { method: "DELETE" });
+  await fetch(`http://localhost:3000/users/${id}/favourite`, {
+  method: "DELETE",
+  headers: {
+    "x-role": store.loggedUser.role
+  }
+});
   getUsers();
 };
+const sendEmailCode = async () => {
+  errorMessage.value = "";
 
+  if (!emailRegex.test(newUser.value.email)) {
+    return (errorMessage.value = "Invalid email format");
+  }
+
+  const res = await fetch("http://localhost:3000/send-email-code", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: newUser.value.email }),
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    errorMessage.value = data.error;
+  } else {
+    codeSent.value = true;
+  }
+};
+const verifyEmailCode = async () => {
+  errorMessage.value = "";
+
+  if (!emailCode.value) {
+    return (errorMessage.value = "Enter verification code");
+  }
+
+  const res = await fetch("http://localhost:3000/verify-email-code", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: newUser.value.email,
+      code: emailCode.value,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    errorMessage.value = data.error;
+  } else {
+    emailVerified.value = true;
+  }
+};
 // const searchUsers()async  {
 //   if (!this.searchQuery || this.searchQuery.trim().length < 1) {
 //     this.filteredUsers = [];
@@ -166,6 +244,16 @@ const saveAdminEdit = async () => {
   if (!adminEdit.value.nickname || !adminEdit.value.email) {
     return (errorMessage.value = "Nickname and email required");
   }
+  if (
+    adminEdit.value.password &&
+    !passwordRegex.test(adminEdit.value.password)
+  ) {
+    return (errorMessage.value =
+      "Password must be at least 6 characters and contain uppercase, lowercase and special character");
+  }
+  if (!emailRegex.test(adminEdit.value.email)) {
+  return (errorMessage.value = "Invalid email format");
+}
 
   const id = adminEditUser.value.user_id;
   const formData = new FormData();
@@ -224,7 +312,7 @@ const saveAdminEdit = async () => {
       <div v-for="u in users" :key="u.user_id" class="user-card">
         <div class="user-header">
           <img
-            :src="u.avatar_url || '/default-avatar.png'"
+            :src="u.avatar_url || 'http://localhost:3000/default-avatar.png'"
             alt="avatar"
             class="avatar"
           />
@@ -306,13 +394,26 @@ const saveAdminEdit = async () => {
           <h3>Register</h3>
           <input v-model="newUser.nickname" placeholder="Nickname" />
           <input v-model="newUser.password" type="password" placeholder="Password" />
-          <input v-model="newUser.email" placeholder="email"  />
+          <input v-model="newUser.email" placeholder="Email" />
+
+          <button v-if="!codeSent" @click="sendEmailCode">
+            Send verification code
+          </button>
+
+          <div v-if="codeSent && !emailVerified">
+            <input v-model="emailCode" placeholder="Enter code" />
+            <button @click="verifyEmailCode">Verify</button>
+          </div>
+
+          <p v-if="emailVerified" style="color:#27ae60">
+            Email verified ✔
+          </p>
+
           <button @click="addUser">Register</button>
           <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
         </div>
       </div>
     </teleport>
-
   </div>
 </template>
 

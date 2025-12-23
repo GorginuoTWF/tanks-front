@@ -40,6 +40,11 @@ const routes = [
     component: Location
   },
   {
+    path:"/battle/new",
+    name:"NewLocation",
+    component: Location
+  },
+  {
     path:"/tank/:id",
     name:"TankCard",
     component: TankCard
