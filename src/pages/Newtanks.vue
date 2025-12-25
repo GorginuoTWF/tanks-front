@@ -125,7 +125,7 @@ const filterTanks = async () => {
 <h2>Tank of the Day</h2>
    <div v-if="tankOfTheDay" class="tank-of-the-day-card">
     <!-- Left: Image -->
-    <router-link :to="`http://localhost:3000/tank/${tankOfTheDay.tank_id}`">
+    <router-link :to="`/tank/${tankOfTheDay.tank_id}`">
       <img
         v-if="firstTankPhotos[tankOfTheDay.tank_id]"
         :src="`http://localhost:3000/uploads/tankphoto/${firstTankPhotos[tankOfTheDay.tank_id].filename}`"
@@ -181,7 +181,7 @@ const filterTanks = async () => {
       :key="tank.tank_id"
       class="tank-card"
     >
-      <router-link :to="`http://localhost:3000http://localhost:3000/tank/${tank.tank_id}`">
+      <router-link :to="`/tank/${tank.tank_id}`">
         <img
           v-if="firstTankPhotos[tank.tank_id]"
           :src="`http://localhost:3000/uploads/tankphoto/${firstTankPhotos[tank.tank_id].filename}`"

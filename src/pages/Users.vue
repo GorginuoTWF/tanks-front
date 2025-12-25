@@ -1,7 +1,6 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { store } from "../store";
-
 
 // === REACTIVE DATA ===
 const users = ref([]);
@@ -9,7 +8,10 @@ const searchQuery = ref("");
 const searchResults = ref([]);
 let searchTimer = null;
 const errorMessage = ref("");
-
+const MAX_EMAIL_ATTEMPTS = 3;
+const MAX_VERIFY_ATTEMPTS = 3;
+const emailAttempts = ref(0);
+const verifyAttempts = ref(0);
 const showLogin = ref(false);
 const showRegister = ref(false);
 const showAdminEdit = ref(false);
@@ -22,6 +24,8 @@ const newUser = ref({
   password: "",
   email: "",
 });
+
+const attemptsStore = ref({});
 
 const adminEditUser = ref(null);
 const adminEdit = ref({
@@ -52,7 +56,24 @@ const validateRegister = () => {
 onMounted(() => {
   const saved = localStorage.getItem("loggedUser");
   if (saved) store.loggedUser = JSON.parse(saved);
+  const savedAttempts = localStorage.getItem("attemptsStore");
+  if (savedAttempts) attemptsStore.value = JSON.parse(savedAttempts);
   getUsers();
+});
+
+watch(() => newUser.value.email, (newEmail) => {
+  if (newEmail) {
+    const att = attemptsStore.value[newEmail] || {emailAttempts: 0, verifyAttempts: 0};
+    emailAttempts.value = att.emailAttempts;
+    verifyAttempts.value = att.verifyAttempts;
+  } else {
+    emailAttempts.value = 0;
+    verifyAttempts.value = 0;
+  }
+  codeSent.value = false;
+  emailVerified.value = false;
+  emailCode.value = '';
+  errorMessage.value = '';
 });
 
 // === API FUNCTIONS ===
@@ -139,12 +160,14 @@ const removeFavourite = async (id) => {
 };
 const sendEmailCode = async () => {
   errorMessage.value = "";
-
+  if (emailAttempts.value >= MAX_EMAIL_ATTEMPTS) {
+    return (errorMessage.value = "Too many attempts. Try later or use another email.");
+  }
   if (!emailRegex.test(newUser.value.email)) {
     return (errorMessage.value = "Invalid email format");
   }
 
-  const res = await fetch("http://localhost:3000/send-email-code", {
+  const res = await fetch("http://localhost:3000/users/send-email-code", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: newUser.value.email }),
@@ -154,18 +177,27 @@ const sendEmailCode = async () => {
 
   if (data.error) {
     errorMessage.value = data.error;
-  } else {
+  }  else {
+    emailAttempts.value++;
+    verifyAttempts.value = 0; // Reset verification attempts on new code send
+    attemptsStore.value[newUser.value.email] = {emailAttempts: emailAttempts.value, verifyAttempts: verifyAttempts.value};
+    localStorage.setItem("attemptsStore", JSON.stringify(attemptsStore.value));
     codeSent.value = true;
+    emailCode.value = ''; // Clear the code input
   }
 };
 const verifyEmailCode = async () => {
   errorMessage.value = "";
 
+  if (verifyAttempts.value >= MAX_VERIFY_ATTEMPTS) {
+    return (errorMessage.value = "Too many wrong verification attempts. Please request a new code or try later.");
+  }
+
   if (!emailCode.value) {
     return (errorMessage.value = "Enter verification code");
   }
 
-  const res = await fetch("http://localhost:3000/verify-email-code", {
+  const res = await fetch("http://localhost:3000/users/verify-email-code", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -177,10 +209,20 @@ const verifyEmailCode = async () => {
   const data = await res.json();
 
   if (data.error) {
+    verifyAttempts.value++;
+    attemptsStore.value[newUser.value.email] = {emailAttempts: emailAttempts.value, verifyAttempts: verifyAttempts.value};
+    localStorage.setItem("attemptsStore", JSON.stringify(attemptsStore.value));
     errorMessage.value = data.error;
+    if (verifyAttempts.value >= MAX_VERIFY_ATTEMPTS) {
+      errorMessage.value = "Too many wrong verification attempts. Please request a new code or try later.";
+    }
   } else {
-    emailVerified.value = true;
-  }
+  emailVerified.value = true;
+  verifyAttempts.value = 0;
+  emailAttempts.value = 0;
+  delete attemptsStore.value[newUser.value.email];
+  localStorage.setItem("attemptsStore", JSON.stringify(attemptsStore.value));
+}
 };
 // const searchUsers()async  {
 //   if (!this.searchQuery || this.searchQuery.trim().length < 1) {
@@ -289,7 +331,7 @@ const saveAdminEdit = async () => {
       My Profile
     </button>
 
-    <div class="top-buttons">
+    <div class="top-buttons" v-if="!store.loggedUser">
       <button @click="showLogin = true">Login</button>
       <button @click="showRegister = true">Register</button>
     </div>
@@ -391,25 +433,36 @@ const saveAdminEdit = async () => {
     <teleport to="body">
       <div v-if="showRegister" class="modal-backdrop" @click.self="showRegister = false">
         <div class="modal small">
+          <img src="http://localhost:3000/uploads/logo.png" alt="Logo" class="logo" />
           <h3>Register</h3>
           <input v-model="newUser.nickname" placeholder="Nickname" />
           <input v-model="newUser.password" type="password" placeholder="Password" />
           <input v-model="newUser.email" placeholder="Email" />
 
-          <button v-if="!codeSent" @click="sendEmailCode">
+          <button
+            v-if="!codeSent"
+            @click="sendEmailCode"
+            class="fresh-button"
+            :disabled="emailAttempts >= MAX_EMAIL_ATTEMPTS">
             Send verification code
           </button>
 
           <div v-if="codeSent && !emailVerified">
-            <input v-model="emailCode" placeholder="Enter code" />
-            <button @click="verifyEmailCode">Verify</button>
+            <div v-if="verifyAttempts < MAX_VERIFY_ATTEMPTS">
+              <input v-model="emailCode" placeholder="Enter code" />
+              <button @click="verifyEmailCode" class="fresh-button">Verify</button>
+            </div>
+            <div v-else>
+              <p class="error">Too many wrong verification attempts. Please resend the code.</p>
+            </div>
+            <button @click="sendEmailCode" class="fresh-button" :disabled="emailAttempts >= MAX_EMAIL_ATTEMPTS">Resend code</button>
           </div>
 
           <p v-if="emailVerified" style="color:#27ae60">
             Email verified ✔
           </p>
 
-          <button @click="addUser">Register</button>
+          <button @click="addUser" class="fresh-button">Register</button>
           <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
         </div>
       </div>
@@ -420,6 +473,10 @@ const saveAdminEdit = async () => {
 <style scoped>
 .page { max-width: 1100px; margin: 0 auto; padding: 20px; color: #eee; min-height: 100vh; }
 
+.fresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .top-buttons {
   position: fixed;
   top: 15px;
@@ -436,7 +493,7 @@ const saveAdminEdit = async () => {
   border: none;
   cursor: pointer;
 }
-.btn-profile { background: 8px; background: #27ae60; }
+.btn-profile { background: #27ae60; }
 
 .search-box {
   margin: 30px 0;
@@ -554,5 +611,29 @@ const saveAdminEdit = async () => {
   color: white;
 }
 .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
-.error { color: center; color: #e74c3c; margin-top: 10px; }
+.error { color: #e74c3c; margin-top: 10px; }
+
+.logo {
+  display: block;
+  margin: 0 auto 20px;
+  width: 120px;
+}
+
+.fresh-button {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #4CAF50, #2196F3);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin: 10px 0;
+  width: 100%;
+}
+
+.fresh-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
 </style>

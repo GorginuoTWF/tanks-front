@@ -12,13 +12,16 @@
 <template>
   
   <div>
+    
     <nav>
       
-      <RouterLink to="/newtanks" >Tanks</RouterLink> |
-      <RouterLink v-if="isAdmin" to="/tanks">Tank Management</RouterLink> |
-      <RouterLink to="/users">Users</RouterLink> |
-      <RouterLink to="/map">Map</RouterLink> |
-      <RouterLink to="/compare">Compare</RouterLink> |
+      <div class="nav-links">
+      <RouterLink to="/newtanks" >Tanks</RouterLink>|
+      <RouterLink v-if="isAdmin" to="/tanks">Tank Management</RouterLink>|
+      <RouterLink to="/users">Users</RouterLink>|
+      <RouterLink to="/map">Map</RouterLink>|
+      <RouterLink to="/compare">Compare</RouterLink>|
+      </div>
       </nav>
     <RouterView/>
     
@@ -34,18 +37,29 @@
 </template>
 <style scoped>
 nav {
+  display: flex;
+  align-items: center;
   padding: 20px;
   background: #f8f9fa;
   border-bottom: 2px solid #eee;
   margin-bottom: 30px;
-  text-align: center;
-  font-size: 18px;
+  font-size: 32px;
+}
+
+.nav-left {
+  flex-shrink: 0;
+}
+
+.nav-links {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
 }
 
 nav a {
   color: #333;
   text-decoration: none;
-  padding: 0 10px;
   font-weight: 500;
 }
 
@@ -57,5 +71,10 @@ nav a.router-link-active {
   color: #5c8bff;
   font-weight: bold;
 }
-</style>
+.logo {
+  height: 100px;
+  width: 400px;
+  cursor: pointer;
+}
 
+</style>

@@ -98,12 +98,12 @@ const advantage = (a, b, direction = 'higher') => {
 
 <template>
   <div class="compare-page">
-    <h1 class="page-title">Сравнение танков</h1>
+    <h1 class="page-title">Tank Compare</h1>
 
     <div class="tables-container">
       <!-- Левая таблица -->
       <div class="table-wrapper">
-        <h2>Танк 1 {{ selectedTank1 ? '— ' + selectedTank1.name : '' }}</h2>
+        <h2>Tank 1 {{ selectedTank1 ? '— ' + selectedTank1.name : '' }}</h2>
         <table class="tank-table">
           <tbody>
             <tr
@@ -127,7 +127,7 @@ const advantage = (a, b, direction = 'higher') => {
 
       <!-- Правая таблица -->
       <div class="table-wrapper">
-        <h2>Танк 2 {{ selectedTank2 ? '— ' + selectedTank2.name : '' }}</h2>
+        <h2>Tank 2 {{ selectedTank2 ? '— ' + selectedTank2.name : '' }}</h2>
         <table class="tank-table">
           <tbody>
             <tr
@@ -189,7 +189,7 @@ const advantage = (a, b, direction = 'higher') => {
     </tbody>
   </table>
 
-  <button @click="clearAll" class="clear-btn">Очистить выбор</button>
+  <button @click="clearAll" class="clear-btn">Clear Selection</button>
 </div>
   </div>
 </template>

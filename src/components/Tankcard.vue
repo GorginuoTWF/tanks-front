@@ -27,7 +27,8 @@ const adminEdit = ref({
   notes: "",
   mainPhoto: null,
   previewPhoto: "",
-  mainPhotoFilename: ''
+  mainPhotoFilename: '',
+  source_url: ''
 })
 const getNoteFileName = (tankName) => {
   if (!tankName) return ''
@@ -73,7 +74,7 @@ onMounted(async () => {
    if (tank.value.name) {
     const fileName = getNoteFileName(tank.value.name)
     try {
-      const res = await fetch(`http://localhost:3000/notes/${fileName}`)
+      const res = await fetch(`http://localhost:3000/tanks/notes/${fileName}`)
       if (res.ok) {
         const text = await res.text()
         notes.value = text.trim() || 'Заметки пустые.'
@@ -126,11 +127,13 @@ const openAdminEdit = () => {
     summary: tank.value.summary || "",
     notes: tank.value.notes || "",
     mainPhoto: null,
+    source_url: tank.value.source_url || '',
     previewPhoto: photos.value[0]
       ? `http://localhost:3000/${photos.value[0].filepath}`
       : ""
     ,
-    mainPhotoFilename: photos.value[0] ? photos.value[0].filepath : ''
+    mainPhotoFilename: photos.value[0] ? photos.value[0].filepath : '',
+   
   }
   showAdminEdit.value = true
 }
@@ -162,6 +165,7 @@ const saveAdminEdit = async () => {
   fd.append("year_introduced", adminEdit.value.year_introduced)
   fd.append("summary", adminEdit.value.summary)
   fd.append("notes", adminEdit.value.notes)
+  fd.append("source_url", adminEdit.value.source_url)
 
   if (adminEdit.value.mainPhoto) {
     fd.append("mainPhoto", adminEdit.value.mainPhoto)
@@ -188,6 +192,16 @@ const saveAdminEdit = async () => {
     // Refresh photos after update to reflect new main photo
     const photosRes = await fetch(`http://localhost:3000/tanks/${route.params.id}/photos`)
     photos.value = await photosRes.json()
+    // Reload notes after save to reflect changes
+    const fileName = getNoteFileName(tank.value.name)
+    try {
+      const notesRes = await fetch(`http://localhost:3000/tanks/notes/${fileName}`)
+      if (notesRes.ok) {
+        notes.value = await notesRes.text()
+      }
+    } catch (err) {
+      console.error('Failed to reload notes:', err)
+    }
     showAdminEdit.value = false
   }
 }
@@ -255,6 +269,7 @@ const typeName = computed(() => {
   <div v-if="tank" class="tank-container">
     <!-- Левая колонка — только характеристики -->
     <div class="tank-info">
+      
       <h1>{{ tank.name }}</h1>
       <p><b>Country:</b> {{ countryName }}</p>
       <p><b>Type:</b> {{ typeName }}</p>
@@ -266,6 +281,9 @@ const typeName = computed(() => {
       <p><b>Gun:</b> {{ tank.gun_caliber_mm }} mm</p>
       <p><b>Penetration:</b> {{ tank.penetration_mm }} mm</p>
       <p><b>Introduced:</b> {{ tank.year_introduced }}</p>
+      <p><b>Url:</b><a
+        :href="tank.source_url" target="_blank" rel="noopener noreferrer">{{ tank.source_url }}</a></p>  
+    
       <p v-if="tank.summary"><b>Summary:</b> {{ tank.summary }}</p>
     </div>
           <div v-if="store.loggedUser" style="margin-top: 20px">
@@ -416,6 +434,10 @@ const typeName = computed(() => {
           <label for="year_introduced">Year introduced</label>
           <input id="year_introduced" v-model="adminEdit.year_introduced" placeholder="Year introduced" />
         </div>
+        <div class="form-field">
+          <label for="source_url">URL</label>
+          <input id="source_url" v-model="adminEdit.source_url" placeholder="Source URL" />
+        </div>
       </div>
 
       <div class="form-field full-width">
@@ -546,12 +568,13 @@ const typeName = computed(() => {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.95);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-  cursor: zoom-out;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  overflow-y: auto;
+  padding: 40px 60px;
 }
 
 .modal-photo {
@@ -603,10 +626,7 @@ const typeName = computed(() => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7); /* Darker backdrop for focus */
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  background: rgba(0, 0, 0, 0.85);
   z-index: 1000;
 }
 
@@ -649,17 +669,17 @@ const typeName = computed(() => {
   grid-template-columns: 420px 1fr;
   gap: 24px;
   align-items: start;
-  margin-bottom: 32px; /* More space */
+  margin-bottom: 60px; /* More space */
 }
 
 .photo-preview-container {
-  display: flex;
-  flex-direction: column;
+  width: 600px;          /* было ~400 */
+  height: 420px;
 }
 
 .preview {
   width: 100%;
-  height: 340px;
+  height: 300px;
   object-fit: cover;
   border-radius: 12px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
